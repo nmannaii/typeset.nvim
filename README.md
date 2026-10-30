@@ -30,7 +30,7 @@ Regenerate them with `python3 docs/screenshots.py`.
 - a terminal with kitty graphics **unicode placeholders**: kitty or ghostty (also inside herdr)
 - the terminal on the same machine as Neovim (images are passed as file paths)
 
-`:checkhealth typeset` checks all of it.
+`:checkhealth typeset` checks all of it. Full documentation: `:help typeset`.
 
 ## Install (lazy.nvim)
 

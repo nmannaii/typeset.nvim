@@ -1,0 +1,201 @@
+*typeset.txt*        Live, typeset markdown preview in a split
+
+Author:  MANNAII Najmedine
+License: MIT
+Repo:    https://github.com/nmannaii/typeset.nvim
+
+==============================================================================
+CONTENTS                                                    *typeset-contents*
+
+  1. Introduction ................................ |typeset-introduction|
+  2. Requirements ................................ |typeset-requirements|
+  3. Installation ................................ |typeset-installation|
+  4. Usage ....................................... |typeset-usage|
+  5. Commands .................................... |typeset-commands|
+  6. Configuration ............................... |typeset-configuration|
+  7. Lua API ..................................... |typeset-api|
+  8. How it works ................................ |typeset-how-it-works|
+  9. Troubleshooting ............................. |typeset-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                 *typeset* *typeset.nvim*
+                                                *typeset-introduction*
+
+typeset.nvim shows the markdown buffer you are editing, typeset, in a split
+next to it: headings at real font sizes, tables with borders, LaTeX math,
+mermaid diagrams, and code coloured like your colourscheme.
+
+Rendering is done by `typeset-renderer`, a small standalone binary built on
+typst (fonts embedded), a pure-Rust mermaid renderer and a LaTeX to typst
+math converter. No browser, no Node, no LaTeX installation, no system fonts.
+The images are drawn with the kitty graphics protocol.
+
+Your buffer stays plain text. The preview follows the markdown buffer you are
+in and scrolls so the block under the cursor sits level with the cursor.
+
+==============================================================================
+2. REQUIREMENTS                                         *typeset-requirements*
+
+- Neovim 0.12 or later (|nvim_ui_send()|), with 'termguicolors' set.
+- The treesitter `markdown` parser.
+- A terminal with kitty graphics unicode placeholders: kitty or ghostty
+  (also inside multiplexers that forward them, such as herdr).
+- The terminal on the same machine as Neovim: images are passed to it as
+  file paths, so the preview does not work over ssh.
+
+|:checkhealth| typeset checks all of it.
+
+==============================================================================
+3. INSTALLATION                                         *typeset-installation*
+
+With lazy.nvim: >lua
+    {
+      "nmannaii/typeset.nvim",
+      ft = "markdown",
+      cmd = { "Typeset", "TypesetInstall" },
+      build = function()
+        require("typeset.build").install({ sync = true })
+      end,
+      keys = {
+        { "<leader>cp", "<cmd>Typeset<cr>", ft = "markdown",
+          desc = "Markdown preview (typeset)" },
+      },
+      opts = {},
+    }
+<
+The `build` step installs the renderer: it downloads the prebuilt binary for
+your platform from the GitHub releases (see `repo` in
+|typeset-configuration|), and builds it with `cargo` when there is none,
+which takes a few minutes the first time. Run |:TypesetInstall| to do it
+again by hand.
+
+==============================================================================
+4. USAGE                                                       *typeset-usage*
+
+Open a markdown file and run |:Typeset|. The preview opens on the right.
+
+- It shows the markdown buffer you are in, and switches when you switch to
+  another markdown buffer.
+- Moving the cursor scrolls the preview so the cursor's block is level with
+  the cursor.
+- While you edit a block, the preview keeps its previous image until the new
+  one is rendered, so it never flickers or shows raw text.
+- Blocks not rendered yet are shown as dimmed source text.
+- Press `q` in the preview, or run |:Typeset| again, to close it.
+
+Rendered images are cached on disk (`stdpath("cache")/typeset`) by content,
+so reopening a document is instant.
+
+==============================================================================
+5. COMMANDS                                                 *typeset-commands*
+
+                                                                   *:Typeset*
+:Typeset [toggle]
+    Open or close the preview.
+
+:Typeset rerender                                        *:Typeset-rerender*
+    Clear the image cache and render everything again.
+
+:Typeset install                                          *:Typeset-install*
+:TypesetInstall                                              *:TypesetInstall*
+    Download or build the renderer (see |typeset-installation|). A running
+    renderer is replaced; the next render uses the new one.
+
+==============================================================================
+6. CONFIGURATION                                       *typeset-configuration*
+
+Pass options to `require("typeset").setup()` (or `opts` with lazy.nvim).
+The defaults: >lua
+    require("typeset").setup({
+      filetypes = { "markdown" },
+      preview = {
+        position = "right", -- "left", "right", "above" or "below"
+        size = 0.45,        -- fraction of the editor (<= 1), or cells
+      },
+      max_width = 120,      -- cells: images never get wider
+      text_scale = 0.72,    -- body text size / cell height
+      debounce = 150,       -- ms after an edit before re-rendering
+      cell = nil,           -- { w, h } in pixels; nil = measured
+      font = "Inter",       -- or "Libertinus Serif", "New Computer Modern"
+      mono_font = "DejaVu Sans Mono",
+      theme = nil,          -- table or function, see below
+      binary = nil,         -- path to typeset-renderer
+      repo = "nmannaii/typeset.nvim", -- where prebuilt binaries come from
+    })
+<
+                                                       *typeset-config-theme*
+Colours are taken from your colourscheme: `Normal`, the markdown heading
+groups, `Comment`, link groups, and the syntax groups (`@keyword`,
+`@string`, ...) for code blocks. A |:colorscheme| change re-renders the
+preview. `theme` adjusts them: a table is merged into the colours, a
+function receives them and returns the ones to use: >lua
+    theme = { link = "#0969da", code_bg = "#eff1f3" },
+    theme = function(t) t.headings = { t.fg } return t end,
+<
+Fields: `dark`, `fg`, `base` (editor background), `muted`, `border`, `link`,
+`code_bg`, `headings` (levels 1 to 6), `font`, `mono_font`, and `syntax` with
+`keyword`, `string`, `comment`, `function`, `type`, `number`, `constant`,
+`operator`.
+
+                                                        *typeset-config-cell*
+`cell` is the size of one terminal cell in pixels. It is measured from the
+terminal (kitty, ghostty and herdr report it); set it when yours does not
+and text looks too large or too small.
+
+==============================================================================
+7. LUA API                                                       *typeset-api*
+
+require("typeset").setup({opts})                           *typeset.setup()*
+    Configure, see |typeset-configuration|.
+
+require("typeset").toggle()                               *typeset.toggle()*
+    Open or close the preview.
+
+require("typeset.preview").open([{buf}])           *typeset.preview.open()*
+    Open the preview for markdown buffer {buf} (default: current).
+
+require("typeset.preview").close()                *typeset.preview.close()*
+    Close the preview.
+
+require("typeset.preview").is_open()            *typeset.preview.is_open()*
+    Whether the preview is open.
+
+require("typeset.build").install([{opts}])          *typeset.build.install()*
+    Install the renderer. With `{ sync = true }`, wait until it is done (for
+    a plugin manager's build step).
+
+==============================================================================
+8. HOW IT WORKS                                         *typeset-how-it-works*
+
+1. treesitter splits the buffer into top-level blocks.
+2. Each block goes to `typeset-renderer`, one long-running process speaking
+   JSON lines on stdin/stdout. It converts the markdown to typst, renders
+   mermaid to SVG and LaTeX math with mitex, compiles, and writes a PNG as
+   wide as the preview, trimmed to its content and padded to whole cells.
+   Renders run one at a time, nearest the cursor first; renders made stale
+   by further edits are dropped before they start.
+3. Each PNG is sent to the terminal once, by path, with a virtual placement.
+   The preview buffer is made of U+10EEEE placeholder cells whose colour
+   carries the image id, so the terminal draws the images wherever the
+   preview window shows them.
+
+==============================================================================
+9. TROUBLESHOOTING                                   *typeset-troubleshooting*
+
+Nothing shows up ~
+    Run |:checkhealth| typeset. The usual causes: the renderer is not
+    installed (|:TypesetInstall|), 'termguicolors' is off, the terminal has
+    no kitty unicode placeholders, or Neovim runs over ssh.
+
+Text is too small or too large ~
+    Set `cell` (|typeset-config-cell|) or `text_scale`.
+
+A diagram looks wrong ~
+    Mermaid is rendered by a Rust port of mermaid, which does not lay out
+    every diagram the way mermaid.js does (state diagrams with long
+    self-loop labels in particular).
+
+Something is stale ~
+    |:Typeset-rerender| clears the cache.
+
+ vim:tw=78:ts=8:ft=help:norl:
