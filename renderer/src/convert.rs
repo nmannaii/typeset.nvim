@@ -195,9 +195,11 @@ fn preamble(theme: &Theme, page: Page) -> String {
 #show raw.where(block: false): it => box(
   fill: code-bg, inset: (x: 0.3em), outset: (y: 0.25em), radius: 4pt, text(size: 0.92em, it),
 )
+// Set rules, not `par(..., it)`: a code block is block content, which par() drops silently.
+#show raw.where(block: true): set par(leading: 0.6em)
+#show raw.where(block: true): set text(size: 0.9em)
 #show raw.where(block: true): it => block(
-  fill: code-bg, inset: (x: 1em, y: 0.85em), radius: 6pt, width: 100%,
-  text(size: 0.9em, par(leading: 0.6em, it)),
+  fill: code-bg, inset: (x: 1em, y: 0.85em), radius: 6pt, width: 100%, it,
 )
 
 #set list(marker: (text(fill: muted)[•], text(fill: muted)[◦], text(fill: muted)[▪]), indent: 0.3em, body-indent: 0.6em, spacing: 0.5em)
@@ -242,13 +244,19 @@ fn preamble(theme: &Theme, page: Page) -> String {
     )
 }
 
-fn alert(kind: BlockQuoteKind) -> (&'static str, &'static str) {
-    match kind {
-        BlockQuoteKind::Note => ("Note", "#82aaff"),
-        BlockQuoteKind::Tip => ("Tip", "#c3e88d"),
-        BlockQuoteKind::Important => ("Important", "#c099ff"),
-        BlockQuoteKind::Warning => ("Warning", "#ffc777"),
-        BlockQuoteKind::Caution => ("Caution", "#ff757f"),
+/// Title and colour of a GitHub alert (`> [!NOTE]`), readable on dark or light backgrounds.
+fn alert(kind: BlockQuoteKind, dark: bool) -> (&'static str, &'static str) {
+    match (kind, dark) {
+        (BlockQuoteKind::Note, true) => ("Note", "#82aaff"),
+        (BlockQuoteKind::Tip, true) => ("Tip", "#c3e88d"),
+        (BlockQuoteKind::Important, true) => ("Important", "#c099ff"),
+        (BlockQuoteKind::Warning, true) => ("Warning", "#ffc777"),
+        (BlockQuoteKind::Caution, true) => ("Caution", "#ff757f"),
+        (BlockQuoteKind::Note, false) => ("Note", "#0969da"),
+        (BlockQuoteKind::Tip, false) => ("Tip", "#1a7f37"),
+        (BlockQuoteKind::Important, false) => ("Important", "#8250df"),
+        (BlockQuoteKind::Warning, false) => ("Warning", "#9a6700"),
+        (BlockQuoteKind::Caution, false) => ("Caution", "#cf222e"),
     }
 }
 
@@ -345,7 +353,7 @@ pub fn convert(markdown: &str, theme: &Theme, page: Page) -> Document {
                     let _ = write!(out, "#heading(level: {}, outlined: false)[", level as usize);
                 }
                 Tag::BlockQuote(kind) => {
-                    let (title, color) = kind.map(alert).map_or(("none".to_string(), theme.muted.as_str()), |(t, c)| (string(t), c));
+                    let (title, color) = kind.map(|k| alert(k, theme.dark)).map_or(("none".to_string(), theme.muted.as_str()), |(t, c)| (string(t), c));
                     let _ = write!(out, "#quote-block({title}, rgb({}))[", string(color));
                 }
                 Tag::CodeBlock(kind) => {

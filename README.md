@@ -12,6 +12,18 @@ typst math converter.
 Your buffer stays plain text: nothing in it is replaced or hidden. While you edit a block the
 preview keeps its previous image until the new one is rendered, so it never flickers.
 
+## Screenshots
+
+![The markdown source of docs/demo.md and its typeset preview](docs/screenshots/source-and-preview.png)
+
+| Dark (tokyonight-moon colours) | Light (GitHub colours) |
+|---|---|
+| ![Preview, dark](docs/screenshots/preview-dark.png) | ![Preview, light](docs/screenshots/preview-light.png) |
+
+[docs/demo.md](docs/demo.md) rendered by `typeset-renderer`: the same images the preview shows,
+laid on the theme's background (the source pane is the markdown drawn as a code block).
+Regenerate them with `python3 docs/screenshots.py`.
+
 ## Requirements
 
 - Neovim 0.12+ (`nvim_ui_send`) with `termguicolors` and the treesitter `markdown` parser

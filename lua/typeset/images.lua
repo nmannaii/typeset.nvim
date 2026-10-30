@@ -6,7 +6,7 @@ local renderer = require("typeset.renderer")
 local terminal = require("typeset.terminal")
 
 -- Bump when the renderer's output changes for the same input, to invalidate the disk cache.
-local CACHE_VERSION = "4"
+local CACHE_VERSION = "5"
 local cache_dir = vim.fn.stdpath("cache") .. "/typeset"
 
 ---@class typeset.Image
