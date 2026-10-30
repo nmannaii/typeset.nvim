@@ -1,0 +1,20 @@
+[package]
+name = "typeset-renderer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mermaid-rs-renderer = { path = "../vendor/mermaid-rs-renderer", default-features = false }
+mitex = "0.2.4"
+pulldown-cmark = "0.13.6"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tiny-skia = "0.12.0"
+typst = "0.15.1"
+typst-assets = { version = "0.15.1", features = ["fonts"] }
+typst-layout = "0.15.1"
+typst-render = "0.15.1"
+
+[profile.release]
+strip = true
+lto = "thin"

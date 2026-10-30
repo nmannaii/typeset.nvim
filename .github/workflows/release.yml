@@ -1,0 +1,39 @@
+# Builds typeset-renderer for each platform on a version tag and attaches the binaries to the
+# GitHub release, named typeset-renderer-<target> as lua/typeset/build.lua downloads them.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm }
+          - { target: x86_64-apple-darwin, os: macos-13 }
+          - { target: aarch64-apple-darwin, os: macos-14 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: renderer
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }} --manifest-path renderer/Cargo.toml
+      - name: Name the binary after its target
+        run: cp renderer/target/${{ matrix.target }}/release/typeset-renderer typeset-renderer-${{ matrix.target }}
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: typeset-renderer-${{ matrix.target }}
