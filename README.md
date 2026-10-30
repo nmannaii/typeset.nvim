@@ -78,6 +78,7 @@ groups for code blocks), so the preview follows it, `:colorscheme` changes inclu
    buffer is made of U+10EEEE placeholder cells whose colour carries the image id, block after
    block, so the terminal draws the images wherever the preview window shows them.
 
-## Third-party code
+## License
 
-See [THIRD_PARTY.md](THIRD_PARTY.md).
+MIT, see [LICENSE](LICENSE). Bundled third-party code and fonts keep their own licenses, see
+[THIRD_PARTY.md](THIRD_PARTY.md).
