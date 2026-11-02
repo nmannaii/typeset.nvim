@@ -187,9 +187,24 @@ function M.show(img)
   end
 end
 
---- Forget what the terminal has (it may have been reset, e.g. after a suspend).
+--- Free every image in the terminal except `ids`. Terminals cap image storage and evict silently,
+--- leaving blank placeholders, so images left behind by resizes must not pile up there.
+---@param ids table<integer, true>
+function M.retain(ids)
+  for id in pairs(transmitted) do
+    if not ids[id] then
+      terminal.delete(id)
+      transmitted[id] = nil
+    end
+  end
+end
+
+--- The terminal may have lost its images (a reset after a suspend, a resize): send them again
+--- when next shown. Ids stay known so `retain` can still free the ones not shown again.
 function M.forget_transmitted()
-  transmitted = {}
+  for id in pairs(transmitted) do
+    transmitted[id] = false
+  end
 end
 
 --- Free every image in the terminal.

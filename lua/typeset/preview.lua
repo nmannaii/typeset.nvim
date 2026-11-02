@@ -88,6 +88,7 @@ function M.build()
   for _, i in ipairs(order) do
     found[i] = images.get(new_blocks[i].text, width, on_ready, { owner = "preview" }) or false
   end
+  local shown = {}
   for i, b in ipairs(new_blocks) do
     starts[i] = #lines
     local img = found[i] or nil
@@ -96,6 +97,7 @@ function M.build()
     img = img or prev
     if img and not img.error and img.rows > 0 then
       images.show(img)
+      shown[img.id] = true
       last[i] = img
       local from = #lines
       vim.list_extend(lines, placeholder.lines(img.cols, img.rows))
@@ -109,6 +111,7 @@ function M.build()
       lines[#lines + 1] = ""
     end
   end
+  images.retain(shown)
   p.blocks, p.starts, p.last = new_blocks, starts, last
   vim.bo[p.buf].modifiable = true
   vim.api.nvim_buf_set_lines(p.buf, 0, -1, false, lines)
@@ -267,6 +270,7 @@ function M.close()
   p.timer:stop()
   p.timer:close()
   images.want("preview", {})
+  images.retain({})
   pcall(vim.api.nvim_del_augroup_by_id, p.augroup)
   if vim.api.nvim_win_is_valid(p.win) and #vim.api.nvim_list_wins() > 1 then
     pcall(vim.api.nvim_win_close, p.win, true)

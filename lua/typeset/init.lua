@@ -25,6 +25,7 @@ function M.setup(opts)
     group = group,
     callback = function()
       require("typeset.terminal").reset() -- a terminal zoom changes the cell size too
+      require("typeset.images").forget_transmitted()
       preview().refresh()
     end,
   })
