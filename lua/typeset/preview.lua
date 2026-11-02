@@ -78,11 +78,15 @@ function M.build()
     end
     return x < y
   end)
+  -- Declare what is wanted before requesting it: `images.get` starts the queue, which drops any
+  -- job that isn't wanted, so doing this afterwards would drop every new render.
+  for _, b in ipairs(new_blocks) do
+    hashes[images.hash(b.text, width)] = true
+  end
+  images.want("preview", hashes)
   local found = {}
   for _, i in ipairs(order) do
-    local img, hash = images.get(new_blocks[i].text, width, on_ready, { owner = "preview" })
-    hashes[hash] = true
-    found[i] = img or false
+    found[i] = images.get(new_blocks[i].text, width, on_ready, { owner = "preview" }) or false
   end
   for i, b in ipairs(new_blocks) do
     starts[i] = #lines
@@ -105,7 +109,6 @@ function M.build()
       lines[#lines + 1] = ""
     end
   end
-  images.want("preview", hashes)
   p.blocks, p.starts, p.last = new_blocks, starts, last
   vim.bo[p.buf].modifiable = true
   vim.api.nvim_buf_set_lines(p.buf, 0, -1, false, lines)
