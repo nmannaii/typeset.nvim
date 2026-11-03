@@ -19,6 +19,12 @@ function M.check()
     h.ok("nvim_ui_send and 'termguicolors' available")
   end
 
+  if terminal.transfer() == "direct" then
+    h.ok("images sent as data (transfer = direct): the terminal may be on another machine")
+  else
+    h.ok("images sent as file paths (transfer = file): the terminal must be on this machine")
+  end
+
   local tty = terminal.tty()
   if tty then
     h.ok("UI tty: " .. tty)

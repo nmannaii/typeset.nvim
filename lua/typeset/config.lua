@@ -28,6 +28,9 @@ local defaults = {
   text_scale = 0.72, -- body text size as a fraction of the cell height
   debounce = 150, -- ms after the last edit before the preview re-renders
   cell = nil, ---@type integer[]? { width, height } in pixels; nil = measured from the terminal
+  -- How images reach the terminal: "file" (by path: fast, same machine only), "direct" (the
+  -- bytes in the escape codes: works over ssh), "auto" (direct over ssh, file otherwise).
+  transfer = "auto", ---@type "auto"|"file"|"direct"
   font = "Inter", -- embedded in the renderer: Inter, Libertinus Serif, New Computer Modern
   mono_font = "DejaVu Sans Mono",
   theme = nil, ---@type table|fun(theme: table): table? overrides for the colours taken from highlights

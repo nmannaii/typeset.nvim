@@ -42,8 +42,9 @@ in and scrolls so the block under the cursor sits level with the cursor.
 - The treesitter `markdown` parser.
 - A terminal with kitty graphics unicode placeholders: kitty or ghostty
   (also inside multiplexers that forward them, such as herdr).
-- The terminal on the same machine as Neovim: images are passed to it as
-  file paths, so the preview does not work over ssh.
+- Over ssh, images are sent as data in the escape codes instead of as file
+  paths (see `transfer` in |typeset-configuration|).
+- On Windows: kitty or ghostty inside WSL2 (WSLg), with Neovim in WSL too.
 
 |:checkhealth| typeset checks all of it.
 
@@ -184,6 +185,9 @@ The defaults: >lua
       text_scale = 0.72,    -- body text size / cell height
       debounce = 150,       -- ms after an edit before re-rendering
       cell = nil,           -- { w, h } in pixels; nil = measured
+      transfer = "auto",    -- "file": the terminal reads PNGs by path (same
+                            -- machine); "direct": their bytes travel in the
+                            -- escape codes (ssh); "auto": direct over ssh
       font = "Inter",       -- or "Libertinus Serif", "New Computer Modern"
       mono_font = "DejaVu Sans Mono",
       theme = nil,          -- table or function, see below
@@ -266,7 +270,9 @@ require("typeset.build").install([{opts}])          *typeset.build.install()*
 Nothing shows up ~
     Run |:checkhealth| typeset. The usual causes: the renderer is not
     installed (|:TypesetInstall|), 'termguicolors' is off, the terminal has
-    no kitty unicode placeholders, or Neovim runs over ssh.
+    no kitty unicode placeholders, or the terminal can't read the PNG files
+    (Neovim on another machine than the terminal without ssh: set
+    `transfer = "direct"`).
 
 Text is too small or too large ~
     Set `cell` (|typeset-config-cell|) or `text_scale`.

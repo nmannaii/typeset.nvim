@@ -43,9 +43,15 @@ block). Regenerate them with `python3 docs/screenshots.py`.
 
 - Neovim 0.12+ (`nvim_ui_send`) with `termguicolors` and the treesitter `markdown` parser
 - a terminal with kitty graphics **unicode placeholders**: kitty or ghostty (also inside herdr)
-- the terminal on the same machine as Neovim (images are passed as file paths)
+- over ssh too: images then travel as data in the escape codes (`transfer`, automatic)
 
 `:checkhealth typeset` checks all of it. Full documentation: `:help typeset`.
+
+### Windows
+
+kitty and ghostty have no Windows build, and Windows Terminal only speaks sixel. Run Linux in
+WSL2 and use kitty or ghostty from there (WSLg shows them as Windows windows): Neovim, the
+terminal and the renderer then all run inside WSL, as on Linux.
 
 ## Install (lazy.nvim)
 
@@ -91,6 +97,7 @@ require("typeset").setup({
   text_scale = 0.72, -- body text size / cell height
   debounce = 150,    -- ms after an edit
   cell = nil,        -- { w, h } pixels; nil = measured from the terminal
+  transfer = "auto", -- "file" (by path), "direct" (as data, works over ssh), "auto"
   font = "Inter",    -- or "Libertinus Serif", "New Computer Modern"
   mono_font = "DejaVu Sans Mono",
   theme = nil,       -- table merged into, or function(theme) returning, the colours
@@ -111,7 +118,7 @@ groups for code blocks), so the preview follows it, `:colorscheme` changes inclu
    to whole cells. Typst memoizes between requests; PNGs are cached on disk by content hash.
    Renders run one at a time, blocks on screen first, and renders made stale by further edits
    are dropped before they start.
-3. Each PNG is sent to the terminal once (`t=f`: by path) with a virtual placement; the preview
+3. Each PNG is sent to the terminal once (`t=f`: by path, or its bytes over ssh) with a virtual placement; the preview
    buffer is made of U+10EEEE placeholder cells whose colour carries the image id, block after
    block, so the terminal draws the images wherever the preview window shows them.
 

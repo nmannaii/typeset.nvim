@@ -92,21 +92,57 @@ function M.unsupported()
     return "needs 'termguicolors' (image ids travel as 24-bit colours)"
   end
   -- No UI check: files given on the command line get their FileType before the TUI attaches.
-  if vim.env.SSH_CONNECTION or vim.env.SSH_CLIENT then
-    return "the terminal is on another machine (ssh): it can't read the rendered files"
+end
+
+--- How images reach the terminal: "file" (it reads the PNG by path) or "direct" (the PNG's
+--- bytes travel in the escape codes, so the terminal can be on another machine).
+---@return "file"|"direct"
+function M.transfer()
+  local mode = require("typeset.config").get().transfer
+  if mode == "file" or mode == "direct" then
+    return mode
   end
+  -- auto: over ssh the terminal can't read our files.
+  return (vim.env.SSH_CONNECTION or vim.env.SSH_CLIENT or vim.env.SSH_TTY) and "direct" or "file"
 end
 
 local function apc(keys, payload)
   return "\27_G" .. keys .. (payload and (";" .. payload) or "") .. "\27\\"
 end
 
+local CHUNK = 4096 -- the protocol's limit for one chunk of base64 data
+
+--- The escape codes that send a PNG as image `id` with a virtual placement over `cols` x
+--- `rows` cells. nil when `direct` and the file can't be read.
+---@return string?
+function M.transmit_codes(id, path, cols, rows, mode)
+  local keys = ("a=T,f=100,i=%d,U=1,c=%d,r=%d,q=2"):format(id, cols, rows)
+  if mode ~= "direct" then
+    return apc(keys .. ",t=f", vim.base64.encode(path))
+  end
+  local f = io.open(path, "rb")
+  if not f then
+    return
+  end
+  local data = vim.base64.encode(f:read("*a"))
+  f:close()
+  -- The first chunk carries the keys, the rest only m= (1: more follow, 0: the last).
+  local out = {}
+  for i = 1, #data, CHUNK do
+    local more = i + CHUNK <= #data and 1 or 0
+    local head = i == 1 and (keys .. ",t=d,m=" .. more) or ("q=2,m=" .. more)
+    out[#out + 1] = apc(head, data:sub(i, i + CHUNK - 1))
+  end
+  return table.concat(out)
+end
+
 --- Send a PNG file as image `id` and give it a virtual placement over `cols` x `rows` cells.
 --- Placeholder cells coloured with `id` then show it, wherever they are on screen.
 function M.transmit(id, path, cols, rows)
-  vim.api.nvim_ui_send(
-    apc(("a=T,f=100,t=f,i=%d,U=1,c=%d,r=%d,q=2"):format(id, cols, rows), vim.base64.encode(path))
-  )
+  local codes = M.transmit_codes(id, path, cols, rows, M.transfer())
+  if codes then
+    vim.api.nvim_ui_send(codes)
+  end
 end
 
 --- Free image `id` in the terminal.
