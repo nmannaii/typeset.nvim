@@ -359,13 +359,14 @@ pub(in crate::layout) fn assign_positions_manual(
         }
     }
 
+    // State diagrams use label ranks too (typeset.nvim): without them every transition label
+    // between two ranks piles into the same gap.
     let use_label_dummies = !matches!(
         graph.kind,
         DiagramKind::Flowchart
             | DiagramKind::Class
             | DiagramKind::Er
             | DiagramKind::Requirement
-            | DiagramKind::State
     );
     let gaps_needing_label_rank: Vec<usize> = if use_label_dummies {
         let mut gap_set: HashSet<usize> = HashSet::new();

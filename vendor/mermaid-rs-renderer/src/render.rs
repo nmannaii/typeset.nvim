@@ -1164,12 +1164,16 @@ pub fn render_svg_with_dimensions(
                 let rect = LabelRect::from_center(x, y, label_w, label_h, pad_x, pad_y);
                 let label_fill = theme.edge_label_background.as_str();
                 if label_fill != "none" {
-                    let visible = edge_label_background_visible(
-                        layout.kind,
-                        EdgeLabelKind::Center,
-                        &edge.points,
-                        rect,
-                    );
+                    // A state self-loop's label sits beside its loop, off the line, and
+                    // keeps its box like the labels on lines.
+                    let visible = (layout.kind == crate::ir::DiagramKind::State
+                        && edge.from == edge.to)
+                        || edge_label_background_visible(
+                            layout.kind,
+                            EdgeLabelKind::Center,
+                            &edge.points,
+                            rect,
+                        );
                     let fill_opacity = if visible { fill_opacity } else { 0.0 };
                     let stroke_opacity = if visible { stroke_opacity } else { 0.0 };
                     svg.push_str(&format!(

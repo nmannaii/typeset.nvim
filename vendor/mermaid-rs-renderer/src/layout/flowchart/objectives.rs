@@ -229,6 +229,11 @@ fn relax_edge_span_constraints(
     for _ in 0..passes {
         let mut changed = false;
         for edge in layout_edges {
+            // A self-loop has no span to relax: its gap is always negative, and moving its
+            // node would push it away again on every pass.
+            if edge.from == edge.to {
+                continue;
+            }
             let Some(from_node) = nodes.get(&edge.from) else {
                 continue;
             };

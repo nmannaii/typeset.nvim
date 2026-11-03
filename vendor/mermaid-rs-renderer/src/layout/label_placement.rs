@@ -182,7 +182,7 @@ pub fn resolve_all_label_positions(
     // candidates to the pre-label bounds here.  Endpoint labels remain bounded
     // because they are visually tied to node sides and do not benefit from
     // expanding the canvas.
-    let center_bounds = if layout.kind == DiagramKind::Flowchart {
+    let center_bounds = if matches!(layout.kind, DiagramKind::Flowchart | DiagramKind::State) {
         None
     } else {
         bounds
@@ -210,6 +210,56 @@ pub fn resolve_all_label_positions(
         theme,
         config,
     );
+}
+
+/// Where a self-loop's label may go: just outside the loop, first on the side where the loop
+/// sticks out of its node, then on the other three. The routed anchor sits on the loop, and a
+/// label wider than the loop then covers its node. `size` includes the label's padding.
+fn self_loop_label_anchors(
+    points: &[(f32, f32)],
+    node: &NodeLayout,
+    size: (f32, f32),
+    pad: f32,
+) -> Vec<(f32, f32)> {
+    let Some(first) = points.first() else {
+        return Vec::new();
+    };
+    let (mut min_x, mut max_x, mut min_y, mut max_y) = (first.0, first.0, first.1, first.1);
+    for &(x, y) in points {
+        min_x = min_x.min(x);
+        max_x = max_x.max(x);
+        min_y = min_y.min(y);
+        max_y = max_y.max(y);
+    }
+    let gap = pad.max(4.0);
+    let (mid_x, mid_y) = ((min_x + max_x) / 2.0, (min_y + max_y) / 2.0);
+    // Which sides the loop sticks out of, then the box around the loop and its node.
+    let sticks_out = [
+        max_x > node.x + node.width + 0.5,
+        min_x < node.x - 0.5,
+        max_y > node.y + node.height + 0.5,
+        min_y < node.y - 0.5,
+    ];
+    min_x = min_x.min(node.x);
+    max_x = max_x.max(node.x + node.width);
+    min_y = min_y.min(node.y);
+    max_y = max_y.max(node.y + node.height);
+    let right = (max_x + gap + size.0 / 2.0, mid_y);
+    let left = (min_x - gap - size.0 / 2.0, mid_y);
+    let below = (mid_x, max_y + gap + size.1 / 2.0);
+    let above = (mid_x, min_y - gap - size.1 / 2.0);
+    let mut out = Vec::with_capacity(4);
+    for (side, out_there) in [right, left, below, above].into_iter().zip(sticks_out) {
+        if out_there {
+            out.push(side);
+        }
+    }
+    for side in [right, left, below, above] {
+        if !out.contains(&side) {
+            out.push(side);
+        }
+    }
+    out
 }
 
 fn move_flowchart_labels_off_own_edges(edges: &mut [EdgeLayout]) {
@@ -294,7 +344,12 @@ fn resolve_center_labels(
         vec![None; edges.len()]
     };
     let mut fixed_center_indices: HashSet<usize> = HashSet::new();
+    // State self-loops are placed after the other fixed labels, beside their loop.
+    let self_loop = |edge: &EdgeLayout| kind == DiagramKind::State && edge.from == edge.to;
     for (idx, edge) in edges.iter_mut().enumerate() {
+        if self_loop(edge) {
+            continue;
+        }
         let (Some(label), Some(anchor)) = (&edge.label, edge.label_anchor) else {
             continue;
         };
@@ -333,6 +388,35 @@ fn resolve_center_labels(
         }
         occupied_grid.insert(occupied.len(), &occupied_rect);
         occupied.push(occupied_rect);
+        fixed_center_indices.insert(idx);
+    }
+
+    for (idx, edge) in edges.iter_mut().enumerate() {
+        if !self_loop(edge) {
+            continue;
+        }
+        let (Some(label), Some(node)) = (&edge.label, nodes.get(&edge.from)) else {
+            continue;
+        };
+        let size = (label.width + 2.0 * label_pad_x, label.height + 2.0 * label_pad_y);
+        let rect_at = |c: (f32, f32)| (c.0 - size.0 / 2.0, c.1 - size.1 / 2.0, size.0, size.1);
+        // The side the loop sticks out of first, then the others; the least covered wins.
+        let mut best: Option<((f32, f32), f32)> = None;
+        for candidate in self_loop_label_anchors(&edge.points, node, size, label_pad_x) {
+            let rect = rect_at(candidate);
+            let covered: f32 = occupied.iter().map(|o| overlap_area(&rect, o)).sum::<f32>()
+                + edge_obs_rects.iter().map(|o| overlap_area(&rect, o)).sum::<f32>() * 0.25;
+            if best.is_none_or(|(_, area)| covered < area - 0.5) {
+                best = Some((candidate, covered));
+            }
+        }
+        let Some((anchor, _)) = best else {
+            continue;
+        };
+        edge.label_anchor = Some(anchor);
+        let rect = rect_at(anchor);
+        occupied_grid.insert(occupied.len(), &rect);
+        occupied.push(rect);
         fixed_center_indices.insert(idx);
     }
 

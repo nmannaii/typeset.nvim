@@ -414,7 +414,8 @@ pub(super) fn apply_label_dummy_anchors(
         label_anchors[idx] = Some(center);
 
         let points = &mut routed_points[idx];
-        if !matches!(kind, DiagramKind::Flowchart | DiagramKind::State) && points.len() >= 2 {
+        // State edges pass through their label's rank slot, or the label floats off its edge.
+        if kind != DiagramKind::Flowchart && points.len() >= 2 {
             insert_label_via_point(points, center, direction);
         }
     }
