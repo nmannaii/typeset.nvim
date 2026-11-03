@@ -1,33 +1,43 @@
 # typeset.nvim
 
-A live, typeset preview of markdown in a split next to your buffer: real font sizes for
-headings, tables with borders, LaTeX math, mermaid diagrams, code with your colourscheme. The
-preview follows the buffer you are in and scrolls with your cursor, like a browser preview but
-drawn in the terminal with the kitty graphics protocol.
+Markdown typeset in the terminal, next to your buffer or over it: real font sizes for headings,
+tables, LaTeX math, mermaid diagrams, code in your colourscheme, alerts and task lists. Drawn
+with the kitty graphics protocol, like a browser preview without the browser.
+
+![The markdown source of docs/demo.md and its typeset preview in a split](docs/screenshots/hero.png)
 
 No browser, no Node, no LaTeX, no system fonts. Rendering is done by a small standalone binary
 built on [typst](https://typst.app) (fonts embedded), a pure-Rust mermaid renderer and a LaTeX →
 typst math converter.
 
-Your buffer stays plain text: nothing in it is replaced or hidden. While you edit a block the
-preview keeps its previous image until the new one is rendered, so it never flickers.
+## Three ways to look at a document
 
-**Inline mode** (`:Typeset inline`, or `inline = { enabled = true }`) typesets headings, tables
-and mermaid diagrams in the buffer itself, the way Emacs shows images and scaled headings in
-place; the block under the cursor shows as source, so you edit markdown and read typeset text in
+**Split preview** (`:Typeset`): the document next to your buffer. It follows the markdown
+buffer you are in and scrolls with your cursor. Your buffer stays plain text, and while you edit
+a block the preview keeps its previous image until the new one is rendered, so it never
+flickers.
+
+**Reading overlay** (`:Typeset overlay`): the document over the whole editor, in a centred
+column, for reading. `j`/`k`, `d`/`u` and `]]`/`[[` (headings) move, `e` takes you to the source
+at the block you're reading, `q` closes. It stays bound to the buffer it was opened on.
+
+![The reading overlay: the document in a centred column over the editor](docs/screenshots/overlay.png)
+
+**Inline mode** (`:Typeset inline`, or `inline = { enabled = true }`): headings, tables and
+mermaid diagrams typeset in the buffer itself, the way Emacs shows images and scaled headings in
+place. The block under the cursor shows as source, so you edit markdown and read typeset text in
 one window. See `:help typeset-inline` for its limits.
 
-## Screenshots
+## Your colourscheme
 
-![The markdown source of docs/demo.md and its typeset preview](docs/screenshots/source-and-preview.png)
+Colours come from your highlight groups, so the document follows your colourscheme, dark or
+light.
 
-| Dark (tokyonight-moon colours) | Light (GitHub colours) |
-|---|---|
-| ![Preview, dark](docs/screenshots/preview-dark.png) | ![Preview, light](docs/screenshots/preview-light.png) |
+![The preview in tokyonight-moon and in GitHub light colours](docs/screenshots/themes.png)
 
-[docs/demo.md](docs/demo.md) rendered by `typeset-renderer`: the same images the preview shows,
-laid on the theme's background (the source pane is the markdown drawn as a code block).
-Regenerate them with `python3 docs/screenshots.py`.
+The pictures are [docs/demo.md](docs/demo.md) rendered by `typeset-renderer`, the same images the
+preview shows, framed as editor windows (the source pane is the markdown drawn as a code
+block). Regenerate them with `python3 docs/screenshots.py`.
 
 ## Requirements
 
@@ -58,6 +68,7 @@ releases, and builds it with `cargo` when there is none (a few minutes the first
 | Command | |
 |---|---|
 | `:Typeset` | open / close the preview (`q` in the preview closes it too) |
+| `:Typeset overlay` | open / close the reading overlay on the current buffer |
 | `:Typeset inline` | turn the inline mode on / off in the current buffer |
 | `:Typeset rerender` | clear the image cache and render again |
 | `:TypesetInstall` | download or build the renderer |
@@ -68,6 +79,7 @@ releases, and builds it with `cargo` when there is none (a few minutes the first
 require("typeset").setup({
   filetypes = { "markdown" },
   preview = { position = "right", size = 0.45 }, -- size: fraction of the editor, or cells
+  overlay = { width = 110 },                  -- reading column of the overlay, cells (0: full width)
   inline = {
     enabled = false,                          -- inline mode in every markdown buffer
     kinds = { "heading", "table", "mermaid" }, -- or "all"
