@@ -7,6 +7,9 @@ local commands = {
   toggle = function()
     require("typeset").toggle()
   end,
+  overlay = function()
+    require("typeset").toggle({ overlay = true })
+  end,
   inline = function()
     require("typeset.inline").toggle()
   end,
@@ -33,7 +36,7 @@ end, {
   complete = function()
     return vim.tbl_keys(commands)
   end,
-  desc = "typeset.nvim: toggle (the preview) | inline | rerender | install",
+  desc = "typeset.nvim: toggle (the preview) | overlay | inline | rerender | install",
 })
 
 vim.api.nvim_create_user_command("TypesetInstall", commands.install, { desc = "Download or build typeset-renderer" })

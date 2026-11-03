@@ -8,6 +8,10 @@ local defaults = {
     position = "right", ---@type "left"|"right"|"above"|"below"
     size = 0.45, -- fraction of the editor (<= 1) or columns / lines
   },
+  -- The reading overlay (:Typeset overlay): the buffer typeset over the whole editor.
+  overlay = {
+    width = 110, -- cells of the centred reading column; 0: as wide as the editor
+  },
   -- Inline mode: blocks typeset in the markdown buffer itself, shown as source under the cursor.
   inline = {
     enabled = false, -- turn it on in every markdown buffer

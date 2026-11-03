@@ -11,6 +11,7 @@ CONTENTS                                                    *typeset-contents*
   2. Requirements ................................ |typeset-requirements|
   3. Installation ................................ |typeset-installation|
   4. Usage ....................................... |typeset-usage|
+     Reading overlay ............................. |typeset-overlay|
      Inline mode ................................. |typeset-inline|
   5. Commands .................................... |typeset-commands|
   6. Configuration ............................... |typeset-configuration|
@@ -87,6 +88,27 @@ Open a markdown file and run |:Typeset|. The preview opens on the right.
 Rendered images are cached on disk (`stdpath("cache")/typeset`) by content,
 so reopening a document is instant.
 
+                                                             *typeset-overlay*
+Reading overlay ~
+
+|:Typeset-overlay| shows the current markdown buffer typeset over the whole
+editor (all but the command line and a global statusline), in a centred
+column `overlay.width` cells wide, for reading. It is bound to that buffer:
+it never follows another one, and going to another buffer or window closes
+it (a buffer opened from it, by a picker or |:edit|, takes the window you
+opened the overlay from). The cursor is hidden while you are in it.
+
+Keys in the overlay:
+    j k, <Down> <Up>    scroll a line
+    d u                 scroll half a page
+    <Space> <S-Space>   scroll a page
+    ]] [[               next / previous heading
+    e <CR>              close it, the source cursor on the block at the top
+    q <Esc>             close it
+
+It renders and caches the same way as the split, and opening one closes the
+other.
+
                                                               *typeset-inline*
 Inline mode ~
 
@@ -121,6 +143,10 @@ Limits, from how Nvim 0.12 draws concealed lines and virtual lines:
 :Typeset [toggle]
     Open or close the preview.
 
+:Typeset overlay                                          *:Typeset-overlay*
+    Open or close the reading overlay (|typeset-overlay|) on the current
+    buffer.
+
 :Typeset inline                                            *:Typeset-inline*
     Turn the inline mode (|typeset-inline|) on or off in the current buffer.
 
@@ -142,6 +168,9 @@ The defaults: >lua
       preview = {
         position = "right", -- "left", "right", "above" or "below"
         size = 0.45,        -- fraction of the editor (<= 1), or cells
+      },
+      overlay = {
+        width = 110,        -- reading column, cells; 0: the editor's width
       },
       inline = {
         enabled = false,    -- inline mode in every markdown buffer
@@ -187,11 +216,12 @@ and text looks too large or too small.
 require("typeset").setup({opts})                           *typeset.setup()*
     Configure, see |typeset-configuration|.
 
-require("typeset").toggle()                               *typeset.toggle()*
-    Open or close the preview.
+require("typeset").toggle([{opts}])                       *typeset.toggle()*
+    Open or close the preview; with `{ overlay = true }` the reading overlay.
 
-require("typeset.preview").open([{buf}])           *typeset.preview.open()*
-    Open the preview for markdown buffer {buf} (default: current).
+require("typeset.preview").open([{buf}, {opts}])   *typeset.preview.open()*
+    Open the preview for markdown buffer {buf} (default: current); with
+    `{ overlay = true }` the reading overlay on it.
 
 require("typeset.preview").close()                *typeset.preview.close()*
     Close the preview.

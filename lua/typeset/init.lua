@@ -77,14 +77,15 @@ function M.unsupported()
   return require("typeset.terminal").unsupported()
 end
 
---- Open or close the preview.
-function M.toggle()
+--- Open or close the preview (the reading overlay with `{ overlay = true }`).
+---@param opts? typeset.OpenOpts
+function M.toggle(opts)
   local why = M.unsupported()
   if why and not preview().is_open() then
     vim.notify("typeset: " .. why, vim.log.levels.WARN)
     return
   end
-  preview().toggle()
+  preview().toggle(opts)
 end
 
 return M
