@@ -72,6 +72,9 @@ impl Default for Theme {
 pub struct Page {
     pub width: f64,
     pub text_size: f64,
+    /// No page margins and no space above headings: the block sits between lines of text in the
+    /// editor, whose blank lines space it.
+    pub inline: bool,
 }
 
 pub struct Document {
@@ -158,9 +161,10 @@ fn blend(a: &str, b: &str, alpha: f64) -> String {
     format!("#{:02x}{:02x}{:02x}", m(0), m(1), m(2))
 }
 
-/// The stylesheet: GitHub's markdown layout (sizes, rules under h1/h2, padded code, striped
-/// tables) in the editor's colours. Each block is a page of its own, so the page's bottom
-/// margin is the space between blocks and headings bring their own space above.
+/// The stylesheet, in the editor's colours: tight bold headings (a rule under h1, an accent bar
+/// before h2), roomy body text, code and tables as rounded cards, alerts and quotes as tinted
+/// cards with a coloured bar, drawn checkboxes. Each block is a page of its own, so the page's
+/// bottom margin is the space between blocks and headings bring their own space above.
 fn preamble(theme: &Theme, page: Page) -> String {
     let heading = |level: usize| theme.headings.get(level - 1).or(theme.headings.last()).cloned().unwrap_or(theme.fg.clone());
     let headings: Vec<String> = (1..=6).map(|l| format!("rgb({})", string(&heading(l)))).collect();
@@ -168,57 +172,91 @@ fn preamble(theme: &Theme, page: Page) -> String {
     format!(
         r#"#import "/mitex/specs/mod.typ": mitex-scope
 #let fg = rgb({fg})
+#let base = rgb({base})
 #let muted = rgb({muted})
 #let border = rgb({border})
+#let accent = rgb({link})
 #let code-bg = rgb({code_bg})
 #let stripe = rgb({stripe})
 #let heading-colors = ({headings})
-#set page(width: {width}pt, height: auto, margin: (left: 1em, right: 1em, top: 0pt, bottom: 0.9em), fill: {fill})
+#let tint(c, amount) = color.mix((c, amount), (base, 100% - amount))
+#set page(width: {width}pt, height: auto, margin: {margin}, fill: {fill})
 #set text(font: ({font}, "Libertinus Serif", {mono}), size: {size}pt, fill: fg, hyphenate: false)
-#set par(justify: false, leading: 0.65em, spacing: 1em)
-#show strong: set text(weight: 600)
-#show link: set text(fill: rgb({link}))
+#set par(justify: false, leading: 0.78em, spacing: 1.15em)
+#show strong: set text(weight: 650)
+#show link: it => underline(stroke: 0.7pt + accent.transparentize(55%), offset: 2.6pt, evade: true, text(fill: accent, it))
 
 #show heading: it => {{
-  let size = (1.75em, 1.4em, 1.2em, 1.05em, 0.95em, 0.9em).at(it.level - 1)
-  v(0.5em)
-  let title = text(size: size, weight: 600, fill: heading-colors.at(it.level - 1), it.body)
-  if it.level <= 2 {{
-    block(width: 100%, stroke: (bottom: 0.8pt + border), inset: (bottom: 0.35em), title)
+  let size = (2em, 1.5em, 1.25em, 1.1em, 1em, 0.95em).at(it.level - 1)
+  let weight = (750, 700, 650, 650, 600, 600).at(it.level - 1)
+  let color = heading-colors.at(it.level - 1)
+  {heading_space}
+  let title = text(size: size, weight: weight, tracking: if it.level <= 2 {{ -0.02em }} else {{ -0.01em }}, fill: color, it.body)
+  if it.level == 1 {{
+    block(width: 100%, stroke: (bottom: 1pt + border), inset: (bottom: 0.5em), below: 0.9em, title)
+  }} else if it.level == 2 {{
+    block(below: 0.8em, grid(
+      columns: (auto, 1fr), column-gutter: 0.55em, align: horizon,
+      rect(width: 0.3em, height: size * 0.78, radius: 2pt, fill: color),
+      title,
+    ))
   }} else {{
-    block(title)
+    block(below: 0.7em, title)
   }}
 }}
 
 #set raw(theme: {code_theme})
 #show raw: set text(font: {mono})
 #show raw.where(block: false): it => box(
-  fill: code-bg, inset: (x: 0.3em), outset: (y: 0.25em), radius: 4pt, text(size: 0.92em, it),
+  fill: code-bg, stroke: 0.5pt + border, inset: (x: 0.35em), outset: (y: 0.32em), radius: 4pt,
+  text(size: 0.88em, it),
 )
 // Set rules, not `par(..., it)`: a code block is block content, which par() drops silently.
-#show raw.where(block: true): set par(leading: 0.6em)
-#show raw.where(block: true): set text(size: 0.9em)
-#show raw.where(block: true): it => block(
-  fill: code-bg, inset: (x: 1em, y: 0.85em), radius: 6pt, width: 100%, it,
+#show raw.where(block: true): set par(leading: 0.62em)
+#show raw.where(block: true): set text(size: 0.88em)
+#let code-block(label, body) = block(
+  fill: code-bg, stroke: 0.6pt + border, radius: 8pt, inset: (x: 1.15em, top: 0.95em, bottom: 1em),
+  width: 100%,
+  {{
+    if label != "" {{
+      place(top + right, dx: 0.45em, dy: -0.55em, text(size: 0.72em, weight: 600, tracking: 0.06em, fill: muted, upper(label)))
+    }}
+    body
+  }},
 )
 
-#set list(marker: (text(fill: muted)[•], text(fill: muted)[◦], text(fill: muted)[▪]), indent: 0.3em, body-indent: 0.6em, spacing: 0.5em)
-#set enum(indent: 0.3em, body-indent: 0.6em, spacing: 0.5em)
+#set list(
+  marker: (text(fill: accent)[•], text(fill: muted)[◦], text(fill: muted)[▪]),
+  indent: 0.25em, body-indent: 0.6em, spacing: 0.62em,
+)
+#set enum(numbering: n => text(fill: accent, weight: 600)[#n.], indent: 0.15em, body-indent: 0.6em, spacing: 0.62em)
+#let task(done) = {{
+  box(
+    baseline: 0.16em, width: 0.95em, height: 0.95em, radius: 3pt,
+    stroke: if done {{ none }} else {{ 1.2pt + muted }}, fill: if done {{ accent }} else {{ none }},
+    if done {{ align(center + horizon, text(size: 0.72em, weight: 800, fill: base, "✓")) }},
+  )
+  h(0.5em)
+}}
 
 #set table(
-  stroke: 0.6pt + border,
-  inset: (x: 0.8em, y: 0.5em),
+  stroke: (x, y) => if y > 0 {{ (top: 0.6pt + border) }},
+  inset: (x: 0.85em, y: 0.6em),
   fill: (_, y) => if y == 0 {{ code-bg }} else if calc.even(y) {{ stripe }} else {{ none }},
 )
-#show table.cell.where(y: 0): set text(weight: 600)
+#show table.cell.where(y: 0): set text(weight: 650, fill: muted, size: 0.92em)
+// A box (it fits the table, a block would span the page) in a block of its own (not in a line).
+#show table: it => block(box(stroke: 0.8pt + border, radius: 7pt, clip: true, it))
 
 #let mi(s) = math.equation(block: false, eval("$" + s + "$", scope: mitex-scope))
 #let mb(s) = math.equation(block: true, eval("$" + s + "$", scope: mitex-scope))
 
 #let quote-block(title, color, body) = block(
-  stroke: (left: 3pt + color), inset: (left: 1em, y: 0.2em), width: 100%,
+  fill: tint(color, if title != none {{ 12% }} else {{ 6% }}),
+  stroke: (left: 3pt + color), radius: (right: 6pt),
+  inset: (left: 1em, right: 1em, y: 0.75em), width: 100%,
   {{
-    if title != none {{ text(fill: color, weight: 600, title); parbreak(); body }}
+    if title != none {{ text(fill: color, weight: 700, title); v(0.1em); parbreak(); body }}
     else {{ text(fill: muted, body) }}
   }},
 )
@@ -231,9 +269,12 @@ fn preamble(theme: &Theme, page: Page) -> String {
 "#,
         width = page.width,
         size = page.text_size,
+        margin = if page.inline { "0pt" } else { "(left: 1.25em, right: 1.25em, top: 0pt, bottom: 1em)" },
+        heading_space = if page.inline { "" } else { "v(0.6em)" },
         font = string(&theme.font),
         mono = string(&theme.mono_font),
         fg = string(&theme.fg),
+        base = string(&theme.base),
         muted = string(&theme.muted),
         border = string(&theme.border),
         link = string(&theme.link),
@@ -318,6 +359,9 @@ pub fn convert(markdown: &str, theme: &Theme, page: Page) -> Document {
         | Options::ENABLE_GFM
         | Options::ENABLE_YAML_STYLE_METADATA_BLOCKS;
     let mut in_metadata = false;
+    // Open lists: where their `#list(` call ends in `out`, items, and task items so far. A list
+    // whose items are all tasks loses its bullets, the checkboxes take their place.
+    let mut lists: Vec<(usize, bool, usize, usize)> = Vec::new();
     for event in Parser::new_ext(markdown, options) {
         if let Some((_, text)) = code.as_mut() {
             match event {
@@ -365,9 +409,18 @@ pub fn convert(markdown: &str, theme: &Theme, page: Page) -> Document {
                 }
                 Tag::List(Some(start)) => {
                     let _ = write!(out, "#enum(start: {start}, tight: true, ");
+                    lists.push((out.len(), false, 0, 0));
                 }
-                Tag::List(None) => out.push_str("#list(tight: true, "),
-                Tag::Item => out.push('['),
+                Tag::List(None) => {
+                    out.push_str("#list(tight: true, ");
+                    lists.push((out.len(), true, 0, 0));
+                }
+                Tag::Item => {
+                    if let Some(list) = lists.last_mut() {
+                        list.2 += 1;
+                    }
+                    out.push('[');
+                }
                 Tag::Table(aligns) => {
                     let align: Vec<&str> = aligns
                         .iter()
@@ -414,11 +467,24 @@ pub fn convert(markdown: &str, theme: &Theme, page: Page) -> Document {
                             out.push('\n');
                         }
                         _ => {
-                            let _ = writeln!(out, "#raw(block: true, lang: {}, {})", string(code_lang(&lang)), string(text));
+                            let _ = writeln!(
+                                out,
+                                "#code-block({}, raw(block: true, lang: {}, {}))",
+                                string(&lang),
+                                string(code_lang(&lang)),
+                                string(text)
+                            );
                         }
                     }
                 }
-                TagEnd::List(_) => out.push_str(")\n"),
+                TagEnd::List(_) => {
+                    if let Some((at, bullets, items, tasks)) = lists.pop() {
+                        if bullets && items > 0 && tasks == items {
+                            out.insert_str(at, "marker: none, body-indent: 0em, ");
+                        }
+                    }
+                    out.push_str(")\n");
+                }
                 TagEnd::Item => out.push_str("], "),
                 TagEnd::Table => out.push_str(")\n"),
                 TagEnd::TableHead | TagEnd::TableRow => {}
@@ -440,7 +506,12 @@ pub fn convert(markdown: &str, theme: &Theme, page: Page) -> Document {
             Event::Rule => {
                 let _ = writeln!(out, "#line(length: 100%, stroke: 0.5pt + rgb({}))", string(&theme.muted));
             }
-            Event::TaskListMarker(done) => out.push_str(if done { "#\"☑ \"" } else { "#\"☐ \"" }),
+            Event::TaskListMarker(done) => {
+                if let Some(list) = lists.last_mut() {
+                    list.3 += 1;
+                }
+                out.push_str(if done { "#task(true)" } else { "#task(false)" });
+            }
             Event::Html(html) | Event::InlineHtml(html) => {
                 if html.trim().trim_end_matches('/').trim_end().eq_ignore_ascii_case("<br") || html.trim().eq_ignore_ascii_case("<br>") {
                     out.push_str("#linebreak()");

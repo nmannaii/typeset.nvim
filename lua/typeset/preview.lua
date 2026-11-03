@@ -111,7 +111,7 @@ function M.build()
       lines[#lines + 1] = ""
     end
   end
-  images.retain(shown)
+  images.retain("preview", shown)
   p.blocks, p.starts, p.last = new_blocks, starts, last
   vim.bo[p.buf].modifiable = true
   vim.api.nvim_buf_set_lines(p.buf, 0, -1, false, lines)
@@ -270,7 +270,7 @@ function M.close()
   p.timer:stop()
   p.timer:close()
   images.want("preview", {})
-  images.retain({})
+  images.retain("preview", {})
   pcall(vim.api.nvim_del_augroup_by_id, p.augroup)
   if vim.api.nvim_win_is_valid(p.win) and #vim.api.nvim_list_wins() > 1 then
     pcall(vim.api.nvim_win_close, p.win, true)

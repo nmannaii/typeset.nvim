@@ -2,7 +2,7 @@
 //!
 //! Protocol: one JSON request per line on stdin, one JSON reply per line on stdout.
 //!
-//!   → {"id": 1, "markdown": "# Title", "width": 960, "cell": [10, 20], "out": "/cache/x.png", "theme": {...}}
+//!   → {"id": 1, "markdown": "# Title", "width": 960, "cell": [10, 20], "out": "/cache/x.png", "theme": {...}, "inline": false}
 //!   ← {"id": 1, "path": "/cache/x.png", "width": 960, "height": 60, "cols": 96, "rows": 3}
 //!   ← {"id": 1, "error": "..."}
 //!
@@ -32,6 +32,10 @@ struct Request {
     /// Body text size as a fraction of the cell height.
     #[serde(default = "default_text_scale")]
     text_scale: f64,
+    /// Shown in the editor buffer between lines of text (typeset.nvim's inline mode): no page
+    /// margins and no space above headings, the buffer's blank lines space the blocks.
+    #[serde(default)]
+    inline: bool,
 }
 
 fn default_text_scale() -> f64 {
@@ -51,7 +55,7 @@ fn render(req: &Request) -> Result<Rendered, String> {
         return Err("width and cell must be positive".into());
     }
     // One typst point = one pixel: the page is laid out directly in terminal pixels.
-    let page = convert::Page { width: req.width as f64, text_size: ch as f64 * req.text_scale };
+    let page = convert::Page { width: req.width as f64, text_size: ch as f64 * req.text_scale, inline: req.inline };
     let doc = convert::convert(&req.markdown, &req.theme, page);
     let world = world::MemoryWorld::new(doc.source, doc.files);
     let document = typst::compile::<PagedDocument>(&world).output.map_err(|errors| {

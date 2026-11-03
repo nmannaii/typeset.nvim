@@ -34,9 +34,32 @@ function M.reset()
   cached, cached_json = nil, nil
 end
 
---- The theme as JSON, for cache keys (encoded once, not once per block).
+--- JSON with object keys sorted. vim.json.encode follows Lua's table order, which differs from
+--- one Nvim process to the next, and a cache key must not.
+local function canonical(value)
+  if type(value) ~= "table" then
+    return vim.json.encode(value)
+  end
+  local out = {}
+  if vim.islist(value) then
+    for i, v in ipairs(value) do
+      out[i] = canonical(v)
+    end
+    return "[" .. table.concat(out, ",") .. "]"
+  end
+  local keys = vim.tbl_keys(value)
+  table.sort(keys, function(a, b)
+    return tostring(a) < tostring(b)
+  end)
+  for _, k in ipairs(keys) do
+    out[#out + 1] = vim.json.encode(tostring(k)) .. ":" .. canonical(value[k])
+  end
+  return "{" .. table.concat(out, ",") .. "}"
+end
+
+--- The theme as canonical JSON, for cache keys (encoded once, not once per block).
 function M.json()
-  cached_json = cached_json or vim.json.encode(M.get())
+  cached_json = cached_json or canonical(M.get())
   return cached_json
 end
 

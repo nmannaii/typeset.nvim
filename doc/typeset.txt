@@ -11,6 +11,7 @@ CONTENTS                                                    *typeset-contents*
   2. Requirements ................................ |typeset-requirements|
   3. Installation ................................ |typeset-installation|
   4. Usage ....................................... |typeset-usage|
+     Inline mode ................................. |typeset-inline|
   5. Commands .................................... |typeset-commands|
   6. Configuration ............................... |typeset-configuration|
   7. Lua API ..................................... |typeset-api|
@@ -86,12 +87,42 @@ Open a markdown file and run |:Typeset|. The preview opens on the right.
 Rendered images are cached on disk (`stdpath("cache")/typeset`) by content,
 so reopening a document is instant.
 
+                                                              *typeset-inline*
+Inline mode ~
+
+|:Typeset-inline| typesets blocks in the markdown buffer itself, the way Emacs
+shows images and scaled headings in place: headings at real font sizes,
+tables and mermaid diagrams (see `inline.kinds`). A rendered block's lines are
+concealed and its image drawn in their place. The block under the cursor
+shows as source, so it can be edited: at once in insert mode, after
+`inline.reveal_delay` in normal mode. Scrolling (<C-e>, <C-y>, the wheel)
+does not reveal what the cursor is dragged into.
+
+Set `inline.enabled` to turn it on in every markdown buffer. It works
+alongside the preview and other markdown plugins (render-markdown.nvim keeps
+decorating the text that stays text).
+
+Limits, from how Nvim 0.12 draws concealed lines and virtual lines:
+- A block whose image is taller than the window stays source: the top of
+  such an image could never be scrolled into view.
+- Scrolling line by line past concealed lines with virtual lines gets stuck,
+  loops or bounces back in Nvim 0.12, worse with a larger 'scrolloff'.
+  Windows showing an inline buffer get `inline.scrolloff` (1), and <C-e>,
+  <C-y> and the mouse wheel scroll with the plugin's own scrolling
+  (`inline.scroll_fix`). <C-d>, <C-u>, <C-f> and <C-b> are Nvim's own.
+- Images are sized for the window the buffer is shown in; another window on
+  the same buffer shows them at that size.
+- The text inside an image cannot be selected: the source can, once shown.
+
 ==============================================================================
 5. COMMANDS                                                 *typeset-commands*
 
                                                                    *:Typeset*
 :Typeset [toggle]
     Open or close the preview.
+
+:Typeset inline                                            *:Typeset-inline*
+    Turn the inline mode (|typeset-inline|) on or off in the current buffer.
 
 :Typeset rerender                                        *:Typeset-rerender*
     Clear the image cache and render everything again.
@@ -111,6 +142,14 @@ The defaults: >lua
       preview = {
         position = "right", -- "left", "right", "above" or "below"
         size = 0.45,        -- fraction of the editor (<= 1), or cells
+      },
+      inline = {
+        enabled = false,    -- inline mode in every markdown buffer
+        kinds = { "heading", "table", "mermaid" }, -- or "all"; also "math",
+                            -- "code", "quote", "list", "paragraph", "rule"
+        scrolloff = 1,      -- most 'scrolloff' of windows showing one
+        scroll_fix = true,  -- <C-e>, <C-y>, the wheel: the plugin's scrolling
+        reveal_delay = 100, -- ms the cursor rests before a block shows
       },
       max_width = 120,      -- cells: images never get wider
       text_scale = 0.72,    -- body text size / cell height
@@ -160,6 +199,11 @@ require("typeset.preview").close()                *typeset.preview.close()*
 require("typeset.preview").is_open()            *typeset.preview.is_open()*
     Whether the preview is open.
 
+require("typeset.inline").toggle([{buf}])          *typeset.inline.toggle()*
+require("typeset.inline").attach([{buf}])          *typeset.inline.attach()*
+require("typeset.inline").detach([{buf}])          *typeset.inline.detach()*
+    Turn the inline mode on or off in {buf} (default: current).
+
 require("typeset.build").install([{opts}])          *typeset.build.install()*
     Install the renderer. With `{ sync = true }`, wait until it is done (for
     a plugin manager's build step).
@@ -178,6 +222,13 @@ require("typeset.build").install([{opts}])          *typeset.build.install()*
    The preview buffer is made of U+10EEEE placeholder cells whose colour
    carries the image id, so the terminal draws the images wherever the
    preview window shows them.
+4. In the inline mode the same placeholder cells are virtual lines of the
+   markdown buffer, hung above the first visible line after each concealed
+   block (`conceal_lines`). Inline images have no margins; the blank lines
+   around a block are concealed with it and drawn as empty rows, so spacing
+   stays the source's.
+5. Images no window shows any more are freed in the terminal, which caps
+   its image storage.
 
 ==============================================================================
 9. TROUBLESHOOTING                                   *typeset-troubleshooting*

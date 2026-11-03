@@ -12,6 +12,11 @@ typst math converter.
 Your buffer stays plain text: nothing in it is replaced or hidden. While you edit a block the
 preview keeps its previous image until the new one is rendered, so it never flickers.
 
+**Inline mode** (`:Typeset inline`, or `inline = { enabled = true }`) typesets headings, tables
+and mermaid diagrams in the buffer itself, the way Emacs shows images and scaled headings in
+place; the block under the cursor shows as source, so you edit markdown and read typeset text in
+one window. See `:help typeset-inline` for its limits.
+
 ## Screenshots
 
 ![The markdown source of docs/demo.md and its typeset preview](docs/screenshots/source-and-preview.png)
@@ -53,6 +58,7 @@ releases, and builds it with `cargo` when there is none (a few minutes the first
 | Command | |
 |---|---|
 | `:Typeset` | open / close the preview (`q` in the preview closes it too) |
+| `:Typeset inline` | turn the inline mode on / off in the current buffer |
 | `:Typeset rerender` | clear the image cache and render again |
 | `:TypesetInstall` | download or build the renderer |
 
@@ -62,6 +68,13 @@ releases, and builds it with `cargo` when there is none (a few minutes the first
 require("typeset").setup({
   filetypes = { "markdown" },
   preview = { position = "right", size = 0.45 }, -- size: fraction of the editor, or cells
+  inline = {
+    enabled = false,                          -- inline mode in every markdown buffer
+    kinds = { "heading", "table", "mermaid" }, -- or "all"
+    scrolloff = 1,       -- most 'scrolloff' of windows showing an inline buffer
+    scroll_fix = true,   -- <C-e>, <C-y> and the wheel scroll the plugin's way (Nvim 0.12 bug)
+    reveal_delay = 100,  -- ms the cursor rests in a block before it shows as source
+  },
   max_width = 120,   -- cells
   text_scale = 0.72, -- body text size / cell height
   debounce = 150,    -- ms after an edit

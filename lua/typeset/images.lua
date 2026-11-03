@@ -6,7 +6,7 @@ local renderer = require("typeset.renderer")
 local terminal = require("typeset.terminal")
 
 -- Bump when the renderer's output changes for the same input, to invalidate the disk cache.
-local CACHE_VERSION = "5"
+local CACHE_VERSION = "6"
 local cache_dir = vim.fn.stdpath("cache") .. "/typeset"
 
 ---@class typeset.Image
@@ -21,13 +21,21 @@ local cache_dir = vim.fn.stdpath("cache") .. "/typeset"
 local images = {}
 ---@type table<string, fun(img: typeset.Image)[]>
 local pending = {}
----@type table<integer, string> id -> "cols x rows" it was transmitted with
+---@type table<integer, string|false> id -> "cols x rows" it was transmitted with (false: resend)
 local transmitted = {}
 local next_id = 0x7a0000 -- well away from the small ids snacks.image hands out
 
+---@type table<integer, true> ids whose highlight group exists
+local hl_made = {}
+
+--- The highlight group whose foreground carries image `id`. Created once: every nvim_set_hl()
+--- makes Nvim redraw the whole screen.
 local function hl_group(id)
   local name = "TypesetImage" .. id
-  vim.api.nvim_set_hl(0, name, { fg = id, nocombine = true })
+  if not hl_made[id] then
+    vim.api.nvim_set_hl(0, name, { fg = id, nocombine = true })
+    hl_made[id] = true
+  end
   return name
 end
 
@@ -88,7 +96,7 @@ local function finish(job, reply)
   end
   local callbacks = pending[job.hash] or {}
   pending[job.hash] = nil
-  for _, cb in ipairs(callbacks) do
+  for _, cb in pairs(callbacks) do
     cb(img)
   end
 end
@@ -112,24 +120,38 @@ local function pump()
   end
 end
 
---- Hash of `markdown` rendered `cols` cells wide with the current cell size and colours.
+-- Hashes already computed for the current cell size, text scale and colours: a layout asks for
+-- every block's hash, and sha256 through vimscript costs ~0.1 ms each.
+local memo, memo_prefix, memo_size = {}, nil, 0
+
+--- Hash of `markdown` rendered `cols` cells wide (for the inline mode when `inline`) with the
+--- current cell size and colours.
 ---@return string
-function M.hash(markdown, cols)
+function M.hash(markdown, cols, inline)
   local cell = terminal.cell()
-  return vim.fn.sha256(table.concat({
+  local prefix = table.concat({
     CACHE_VERSION,
-    markdown,
-    cols,
     cell[1],
     cell[2],
     require("typeset.config").get().text_scale,
     require("typeset.theme").json(),
-  }, "\0"))
+  }, "\0")
+  if prefix ~= memo_prefix or memo_size > 10000 then
+    memo, memo_prefix, memo_size = {}, prefix, 0
+  end
+  local key = (inline and "inline\0" or "") .. cols .. "\0" .. markdown
+  local hash = memo[key]
+  if not hash then
+    hash = vim.fn.sha256(prefix .. "\0" .. key)
+    memo[key], memo_size = hash, memo_size + 1
+  end
+  return hash
 end
 
 ---@class typeset.GetOpts
 ---@field owner? any see `want`
 ---@field render? boolean false: only look in the cache, never start a render (default true)
+---@field inline? boolean rendered for the inline mode: no margins (see the renderer)
 
 --- The image of `markdown` rendered `cols` cells wide, and its hash. Returns the image at once
 --- when it is ready (memory or disk cache); otherwise queues a render, returns nil, and calls
@@ -141,7 +163,7 @@ end
 ---@return typeset.Image?, string
 function M.get(markdown, cols, on_ready, opts)
   opts = opts or {}
-  local hash = M.hash(markdown, cols)
+  local hash = M.hash(markdown, cols, opts.inline)
   if images[hash] then
     return images[hash], hash
   end
@@ -154,11 +176,14 @@ function M.get(markdown, cols, on_ready, opts)
   if opts.render == false then
     return nil, hash
   end
+  -- One callback per owner: a layout asks again for every block still rendering, and each ask
+  -- must not add another call when the render is done.
+  local key = opts.owner ~= nil and opts.owner or on_ready
   if pending[hash] then
-    table.insert(pending[hash], on_ready)
+    pending[hash][key] = on_ready
     return nil, hash
   end
-  pending[hash] = { on_ready }
+  pending[hash] = { [key] = on_ready }
   vim.fn.mkdir(cache_dir, "p")
   local config = require("typeset.config").get()
   table.insert(queue, {
@@ -171,6 +196,7 @@ function M.get(markdown, cols, on_ready, opts)
       out = path,
       theme = require("typeset.theme").get(),
       text_scale = config.text_scale,
+      inline = opts.inline or nil,
     },
   })
   pump()
@@ -187,12 +213,25 @@ function M.show(img)
   end
 end
 
---- Free every image in the terminal except `ids`. Terminals cap image storage and evict silently,
---- leaving blank placeholders, so images left behind by resizes must not pile up there.
+---@type table<any, table<integer, true>> owner -> ids it shows
+local shown_by = {}
+
+--- Declare the images `owner` shows now, and free in the terminal every image no owner shows.
+--- Terminals cap image storage and evict silently, leaving blank placeholders, so images left
+--- behind by resizes and edits must not pile up there.
+---@param owner any the preview, or an inline buffer
 ---@param ids table<integer, true>
-function M.retain(ids)
+function M.retain(owner, ids)
+  shown_by[owner] = next(ids) and ids or nil
   for id in pairs(transmitted) do
-    if not ids[id] then
+    local kept = false
+    for _, shown in pairs(shown_by) do
+      if shown[id] then
+        kept = true
+        break
+      end
+    end
+    if not kept then
       terminal.delete(id)
       transmitted[id] = nil
     end
@@ -223,6 +262,7 @@ end
 
 --- Re-create highlight groups (a colourscheme change clears them).
 function M.refresh_hl()
+  hl_made = {}
   for _, img in pairs(images) do
     hl_group(img.id)
   end
